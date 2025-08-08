@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Will's 5x5 Warmup Calculator</title>
+  <meta name="description" content="StrongLifts-style warmup & work-set calculator with plate breakdowns." />
+  <!-- Inter font (optional) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg: #121212;
+      --panel: #1e1e1e;
+      --muted: #c0c0c0;
+      --text: #e0e0e0;
+      --accent: #00aaff;
+      --accent-strong:#007bff;
+      --line: #333;
+      --row: #222;
+      --row-alt:#252525;
+      --thead:#2a2a2a;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 15px rgba(0,0,0,.2);
+      --gap: 10px;
+      --pad: 25px;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      margin:0; padding:20px; min-height:100vh;
+      display:flex; flex-direction:column; align-items:center;
+      background:var(--bg); color:var(--text); line-height:1.6;
+    }
+    .container{
+      width:100%; max-width: 680px; background:var(--panel);
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:var(--pad); margin:20px 0;
+    }
+    h1{ color:var(--accent); text-align:center; margin:0 0 20px }
+    label{ display:block; margin-bottom:8px; font-weight:500; color:var(--muted) }
+    input[type="number"], select{
+      width:100%; padding:12px; border:1px solid #444; border-radius:var(--radius-sm);
+      background:#2c2c2c; color:var(--text); font-size:1rem; margin-bottom:15px;
+    }
+    input[type="number"]:focus, select:focus{
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,170,255,.3);
+    }
+    button{
+      padding:12px 18px; border:none; border-radius:var(--radius-sm);
+      background:var(--accent-strong); color:#fff; cursor:pointer;
+      font-size:1rem; transition: background-color .2s, transform .1s;
+      margin-bottom:10px; text-align:center;
+      min-height:44px; /* touch target */
+    }
+    button:hover{ background:#0056b3; transform: translateY(-1px) }
+    button:active{ transform: translateY(0) }
+    .adjust-buttons{ display:flex; flex-wrap:wrap; gap:var(--gap); margin-bottom:15px }
+    .adjust-buttons button{ flex:1; min-width:120px }
+    fieldset{ border:1px solid #444; border-radius:var(--radius-sm); padding:15px; margin:0 0 15px }
+    legend{ padding:0 6px; color:var(--muted) }
+    .plate-checkbox-grid{
+      display:grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+      gap:var(--gap); margin-bottom:10px;
+    }
+    .plate-checkbox{
+      display:flex; align-items:center; gap:8px;
+      background:#2c2c2c; padding:8px; border-radius:6px; cursor:pointer;
+      transition: background-color .2s;
+    }
+    .plate-checkbox:hover{ background:#383838 }
+    .plate-checkbox input[type="checkbox"]{ accent-color: var(--accent) }
+    .computed-weight{ margin:10px 0 15px; font-size:.95em; color:#b0b0b0 }
+    table{ width:100%; border-collapse:collapse; margin-top:20px; box-shadow: 0 2px 8px rgba(0,0,0,.15) }
+    th, td{ border:1px solid var(--line); padding:12px; text-align:left; vertical-align:top }
+    th{ background:var(--thead); color:var(--accent); font-weight:600 }
+    td{ background:var(--row) }
+    tr:nth-child(even) td{ background:var(--row-alt) }
+    .note{ color:#b0b0b0; font-size:.9em; margin-top:6px }
+    .status{ margin-top:10px; color:#ffce7a; font-size:.95em }
+    @media (max-width:600px){
+      body{ padding:10px } .container{ padding:20px } h1{ font-size:1.8rem }
+    }
+    @media (max-width:400px){
+      .adjust-buttons button{ flex-basis:100%; min-width:0 }
+    }
+  </style>
+</head>
+<body>
+<main class="container" aria-labelledby="title">
+  <h1 id="title">Will's 5x5 Warmup Calculator</h1>
+
+  <section aria-label="Workout Inputs">
+    <form id="workoutForm" onsubmit="return false;">
+      <label for="exercise">Select Exercise</label>
+      <select id="exercise" name="exercise" aria-label="Select Exercise">
+        <option value="squat">Squat</option>
+        <option value="bench">Bench Press</option>
+        <option value="overhead">Overhead Press</option>
+        <option value="row">Barbell Row</option>
+        <option value="deadlift">Deadlift</option>
+      </select>
+
+      <label for="desiredWeight">Work Set Weight (kg)</label>
+      <input type="number" id="desiredWeight" name="desiredWeight" inputmode="decimal" min="20" step="0.5" required aria-describedby="weightHelp">
+
+      <div id="weightHelp" class="note">Snaps to the smallest selected plate pair.</div>
+
+      <div class="computed-weight" aria-live="polite">
+        <span>-10% Weight (Deload): <strong id="minus10PercentWeight">0.0</strong> kg</span>
+      </div>
+
+      <div class="adjust-buttons">
+        <button type="button" id="decreaseWeight" aria-label="Decrease weight by 0.5 kilograms">-0.5 kg</button>
+        <button type="button" id="increaseWeight" aria-label="Increase weight by 0.5 kilograms">+0.5 kg</button>
+      </div>
+
+      <fieldset>
+        <legend>Available Plates (per side, kg)</legend>
+        <div class="plate-checkbox-grid" id="plateGrid">
+          <label class="plate-checkbox"><input type="checkbox" value="25">25</label>
+          <label class="plate-checkbox"><input type="checkbox" value="20">20</label>
+          <label class="plate-checkbox"><input type="checkbox" value="15">15</label>
+          <label class="plate-checkbox"><input type="checkbox" value="10">10</label>
+          <label class="plate-checkbox"><input type="checkbox" value="5">5</label>
+          <label class="plate-checkbox"><input type="checkbox" value="2.5">2.5</label>
+          <label class="plate-checkbox"><input type="checkbox" value="1.25">1.25</label>
+          <label class="plate-checkbox"><input type="checkbox" value="1">1</label>
+          <label class="plate-checkbox"><input type="checkbox" value="0.75">0.75</label>
+          <label class="plate-checkbox"><input type="checkbox" value="0.5">0.5</label>
+          <label class="plate-checkbox"><input type="checkbox" value="0.25">0.25</label>
+        </div>
+        <div class="adjust-buttons">
+          <button type="button" id="selectAllPlates">Select All</button>
+          <button type="button" id="resetPlates">Reset Plates</button>
+        </div>
+      </fieldset>
+    </form>
+  </section>
+
+  <section aria-label="Warmup & Work Sets">
+    <div id="status" class="status" aria-live="polite"></div>
+    <div id="warmupRegion" aria-live="polite"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ---------- Constants ----------
+  const barbellWeight = 20; // kg
+  const exercises = ['bench','deadlift','overhead','row','squat'];
+  const defaultPlates = ['25','20','15','10','5','2.5','1.25']; // initially selected
+
+  // ---------- DOM ----------
+  const exerciseSelect = document.getElementById('exercise');
+  const desiredWeightInput = document.getElementById('desiredWeight');
+  const incBtn = document.getElementById('increaseWeight');
+  const decBtn = document.getElementById('decreaseWeight');
+  const plateGrid = document.getElementById('plateGrid');
+  const selectAllBtn = document.getElementById('selectAllPlates');
+  const resetPlatesBtn = document.getElementById('resetPlates');
+  const deloadDisplay = document.getElementById('minus10PercentWeight');
+  const statusEl = document.getElementById('status');
+  const warmupRegion = document.getElementById('warmupRegion');
+
+  // Utility: debounce
+  function debounce(fn, delay=200){
+    let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), delay); };
+  }
+
+  // ---------- Storage (one JSON blob per exercise) ----------
+  const keyFor = (ex) => `exState_${ex}`;
+  function defaultState() {
+    const plates = {};
+    ['25','20','15','10','5','2.5','1.25','1','0.75','0.5','0.25'].forEach(p=>{
+      plates[p] = defaultPlates.includes(p);
+    });
+    return { lastWeight: 20, plates };
+  }
+  function loadState(ex){
+    try{
+      const raw = localStorage.getItem(keyFor(ex));
+      if(!raw) return defaultState();
+      const obj = JSON.parse(raw);
+      // backward-safe defaults
+      if(typeof obj.lastWeight !== 'number') obj.lastWeight = 20;
+      if(!obj.plates) obj.plates = defaultState().plates;
+      return obj;
+    }catch{ return defaultState(); }
+  }
+  const saveState = debounce((ex, state)=>{
+    try{ localStorage.setItem(keyFor(ex), JSON.stringify(state)); }catch{}
+  }, 150);
+
+  // ---------- Helpers ----------
+  function getSelectedPlates(){
+    const boxes = plateGrid.querySelectorAll('input[type="checkbox"]');
+    const arr = [];
+    boxes.forEach(b => { if(b.checked) arr.push(parseFloat(b.value)); });
+    // sort desc for greedy
+    arr.sort((a,b)=>b-a);
+    return arr;
+  }
+
+  function smallestPairIncrement(plates){
+    if(!plates.length) return 0;
+    const minPlate = Math.min(...plates);
+    return 2 * minPlate; // total added to bar from one pair
+  }
+
+  function snapTotalToIncrement(total, increment){
+    if (increment <= 0) return total;
+    // total must be bar + k*increment
+    const k = Math.round((total - barbellWeight) / increment);
+    return Math.max(barbellWeight, barbellWeight + k * increment);
+  }
+
+  function kg(n){ return Number(n.toFixed(2)); }
+
+  // Greedy plate computation in integer grams to avoid FP errors.
+  function calculateOptimalWeight(targetWeight, plates){
+    if (targetWeight <= barbellWeight) {
+      return { weight: barbellWeight, platePairs: [], exact: (targetWeight === barbellWeight), delta: kg(barbellWeight - targetWeight) };
+    }
+    if (!plates.length) return null;
+
+    // Work in grams (int)
+    const toG = (x)=> Math.round(x*1000);
+    const targetPerSideG = Math.max(0, toG((targetWeight - barbellWeight)/2));
+    let remainG = targetPerSideG;
+    const plateGs = plates.map(p => toG(p));
+
+    const used = []; // {plate:number, count:int} per side
+    for(const pG of plateGs){
+      let count = Math.floor(remainG / pG);
+      if (count > 0){
+        used.push({ plate: pG, count });
+        remainG -= count * pG;
+      }
+    }
+
+    const achievedPerSideG = targetPerSideG - remainG;
+    const totalG = toG(barbellWeight) + achievedPerSideG*2;
+    const achieved = totalG/1000;
+
+    // Convert to kg and rebuild readable pairs
+    const pairs = used.map(u => ({ plate: kg(u.plate/1000), count: u.count }));
+    const exact = remainG === 0;
+    const delta = kg(achieved - targetWeight);
+    return { weight: kg(achieved), platePairs: pairs, exact, delta };
+  }
+
+  function platePairsToLines(pairs){
+    if (!pairs || pairs.length===0) return 'Bar only';
+    return pairs.map(p => `${p.plate}kg × ${p.count}`).join('\n');
+  }
+
+  function setStatus(msg){ statusEl.textContent = msg || ''; }
+
+  // ---------- StrongLifts Warmup Logic (kept as-is in spirit) ----------
+  function generateWarmupSets(workWeight, plates){
+    const selectedExercise = exerciseSelect.value;
+    let warmupConfig = [];
+    let workSetStructure = '5x5';
+    workWeight = Math.max(barbellWeight, workWeight);
+
+    if (selectedExercise === 'squat') {
+      warmupConfig.push({ reps: '2x5', fixedWeight: barbellWeight });
+      if (workWeight > barbellWeight + 10) warmupConfig.push({ reps: '1x5', percentage: 0.40, min: barbellWeight + 5 });
+      if (workWeight > barbellWeight + 20) warmupConfig.push({ reps: '1x3', percentage: 0.60, min: barbellWeight + 10 });
+      if (workWeight > barbellWeight + 30) warmupConfig.push({ reps: '1x2', percentage: 0.80, min: barbellWeight + 15 });
+    } else if (selectedExercise === 'bench') {
+      warmupConfig.push({ reps: '2x5', fixedWeight: barbellWeight });
+      if (workWeight > barbellWeight + 5)  warmupConfig.push({ reps: '1x5', percentage: 0.50, min: barbellWeight + 2.5 });
+      if (workWeight > barbellWeight + 15) warmupConfig.push({ reps: '1x3', percentage: 0.70, min: barbellWeight + 5 });
+      if (workWeight > barbellWeight + 25) warmupConfig.push({ reps: '1x2', percentage: 0.85, min: barbellWeight + 10 });
+    } else if (selectedExercise === 'overhead') {
+      warmupConfig.push({ reps: '2x5', fixedWeight: barbellWeight });
+      if (workWeight > barbellWeight + 2.5) warmupConfig.push({ reps: '1x5', percentage: 0.55, min: barbellWeight + 1.25 });
+      if (workWeight > barbellWeight + 10)  warmupConfig.push({ reps: '1x3', percentage: 0.70, min: barbellWeight + 2.5 });
+      if (workWeight > barbellWeight + 20)  warmupConfig.push({ reps: '1x2', percentage: 0.85, min: barbellWeight + 5 });
+    } else if (selectedExercise === 'row') {
+      const firstWarm = Math.max(barbellWeight, workWeight * 0.4, workWeight > 40 ? 30 : barbellWeight);
+      if (workWeight > barbellWeight) {
+        if (firstWarm < workWeight - 2.5) warmupConfig.push({ reps: '1x5', fixedWeight: firstWarm });
+      }
+      if (workWeight > firstWarm + 10 && workWeight > 40) warmupConfig.push({ reps: '1x3', percentage: 0.70, min: firstWarm + 5 });
+    } else if (selectedExercise === 'deadlift') {
+      workSetStructure = '1x5';
+      const firstWarm = Math.max(barbellWeight, workWeight * 0.4, workWeight > 60 ? 40 : barbellWeight);
+      if (workWeight > barbellWeight) {
+        if (firstWarm < workWeight - 5) warmupConfig.push({ reps: '1x5', fixedWeight: firstWarm });
+      }
+      if (workWeight > firstWarm + 15 && workWeight > 60) warmupConfig.push({ reps: '1x3', percentage: 0.65, min: firstWarm + 10 });
+      if (workWeight > firstWarm + 30 && workWeight > 80) warmupConfig.push({ reps: '1x2', percentage: 0.80, min: firstWarm + 20 });
+    }
+
+    // Build calculated sets
+    const sets = [];
+    warmupConfig.forEach(cfg=>{
+      let target = (cfg.fixedWeight !== undefined) ? cfg.fixedWeight : (workWeight * cfg.percentage);
+      if (cfg.min !== undefined) target = Math.max(target, cfg.min);
+      target = Math.max(barbellWeight, target);
+      target = Math.min(target, workWeight - 0.5);
+      if (target < barbellWeight + 0.1 && cfg.fixedWeight === undefined) return;
+
+      const res = calculateOptimalWeight(target, plates);
+      if (res){
+        sets.push({
+          set: cfg.reps,
+          weight: res.weight,
+          plates: res.platePairs,
+          pct: workWeight > 0 ? Math.round((res.weight / workWeight) * 100) + '%' : ''
+        });
+      }
+    });
+
+    const workRes = calculateOptimalWeight(workWeight, plates);
+    if (workRes){
+      sets.push({
+        set: workSetStructure,
+        weight: workRes.weight,
+        plates: workRes.platePairs,
+        pct: 'Work Set'
+      });
+    }
+
+    // De-dup similar consecutive + sanity
+    const finalSets = [];
+    for (let i=0; i<sets.length; i++){
+      const curr = sets[i];
+      const prev = finalSets[finalSets.length-1];
+      if (prev && prev.weight === curr.weight && prev.set === curr.set) continue;
+      if (curr.pct === 'Work Set' && prev && prev.weight === curr.weight && prev.pct !== 'Work Set'){
+        finalSets.pop();
+      }
+      finalSets.push(curr);
+    }
+
+    if (workWeight === barbellWeight && finalSets.length > 1){
+      return [ finalSets[ finalSets.length - 1 ] ];
+    }
+    return finalSets;
+  }
+
+  // ---------- Rendering ----------
+  function renderTable(sets, workWeight){
+    warmupRegion.textContent = ''; // clear
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Warmup & Work Sets';
+    warmupRegion.appendChild(h2);
+
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const thr = document.createElement('tr');
+    ['Set','Weight (kg)','Plates (per side)'].forEach(t=>{
+      const th = document.createElement('th'); th.textContent = t; thr.appendChild(th);
+    });
+    thead.appendChild(thr); table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    sets.forEach(s=>{
+      const tr = document.createElement('tr');
+      const tdSet = document.createElement('td');
+      const tdW = document.createElement('td');
+      const tdPlates = document.createElement('td');
+
+      tdSet.textContent = s.set + (s.pct ? ` (${s.pct})` : '');
+      tdW.textContent = s.weight.toFixed(1);
+
+      const pre = document.createElement('pre');
+      pre.style.margin = '0';
+      pre.textContent = platePairsToLines(s.plates);
+      tdPlates.appendChild(pre);
+
+      tr.appendChild(tdSet); tr.appendChild(tdW); tr.appendChild(tdPlates);
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    warmupRegion.appendChild(table);
+  }
+
+  // ---------- Updates ----------
+  function updateDeload(){
+    const desired = parseFloat(desiredWeightInput.value) || 0;
+    const deload = Math.max(0, desired * 0.9);
+    deloadDisplay.textContent = deload.toFixed(1);
+  }
+
+  function enforcePlateAndStep(){
+    const plates = getSelectedPlates();
+    const inc = smallestPairIncrement(plates) || 0.5; // fallback
+    desiredWeightInput.step = inc.toString();
+
+    // Snap the current desired weight to achievable lattice (bar + n*inc)
+    let dw = parseFloat(desiredWeightInput.value) || barbellWeight;
+    const snapped = snapTotalToIncrement(dw, inc);
+    if (Math.abs(snapped - dw) > 1e-9){
+      desiredWeightInput.value = snapped.toFixed(1);
+    }
+  }
+
+  function updateAll(){
+    updateDeload();
+    const current = parseFloat(desiredWeightInput.value);
+    if (isNaN(current) || current < barbellWeight){
+      setStatus(`Enter a valid work set weight (at least ${barbellWeight} kg).`);
+      warmupRegion.textContent = '';
+      return;
+    }
+
+    const plates = getSelectedPlates();
+    if (!plates.length && current > barbellWeight){
+      setStatus('Please select available plates to calculate loads.');
+      warmupRegion.textContent = '';
+      return; // guard: do not render sets without plates
+    }
+
+    // Inform if exact match not possible for work set
+    const workRes = calculateOptimalWeight(current, plates);
+    if (workRes === null){
+      setStatus('Unable to compute load with the selected plates.');
+      warmupRegion.textContent = '';
+      return;
+    }
+    const delta = workRes.delta;
+    if (Math.abs(delta) > 0.001){
+      const dir = delta > 0 ? '+' : '−';
+      setStatus(`Achievable work set: ${workRes.weight.toFixed(1)} kg (${dir}${Math.abs(delta).toFixed(1)} kg from target).`);
+    } else {
+      setStatus(''); // exact
+    }
+
+    const sets = generateWarmupSets(current, plates);
+    if (!sets.length){
+      warmupRegion.textContent = '';
+      setStatus('No warmup sets for this configuration.');
+      return;
+    }
+    renderTable(sets, current);
+  }
+
+  const trigger = () => { enforcePlateAndStep(); updateAll(); saveCurrentExerciseState(); };
+
+  // ---------- State wiring ----------
+  function readPlateCheckboxesToObject(){
+    const obj = {};
+    plateGrid.querySelectorAll('input[type="checkbox"]').forEach(b=>{
+      obj[b.value] = !!b.checked;
+    });
+    return obj;
+  }
+
+  function applyPlatesFromObject(platesObj){
+    plateGrid.querySelectorAll('input[type="checkbox"]').forEach(b=>{
+      b.checked = !!platesObj[b.value];
+    });
+  }
+
+  function loadExerciseState(){
+    const ex = exerciseSelect.value;
+    const st = loadState(ex);
+    desiredWeightInput.value = Number(st.lastWeight || 20).toFixed(1);
+    applyPlatesFromObject(st.plates || defaultState().plates);
+  }
+
+  function saveCurrentExerciseState(){
+    const ex = exerciseSelect.value;
+    const st = {
+      lastWeight: parseFloat(desiredWeightInput.value) || 20,
+      plates: readPlateCheckboxesToObject()
+    };
+    saveState(ex, st);
+  }
+
+  // ---------- Events ----------
+  exerciseSelect.addEventListener('change', () => { loadExerciseState(); trigger(); });
+  desiredWeightInput.addEventListener('input', trigger);
+  desiredWeightInput.addEventListener('change', trigger);
+
+  incBtn.addEventListener('click', () => {
+    const inc = parseFloat(desiredWeightInput.step) || 0.5;
+    let val = parseFloat(desiredWeightInput.value) || barbellWeight;
+    val += inc;
+    desiredWeightInput.value = val.toFixed(1);
+    trigger();
+  });
+  decBtn.addEventListener('click', () => {
+    const inc = parseFloat(desiredWeightInput.step) || 0.5;
+    let val = parseFloat(desiredWeightInput.value) || barbellWeight;
+    val = Math.max(barbellWeight, val - inc);
+    desiredWeightInput.value = val.toFixed(1);
+    trigger();
+  });
+
+  plateGrid.querySelectorAll('input[type="checkbox"]').forEach(b=>{
+    b.addEventListener('change', trigger);
+  });
+  selectAllBtn.addEventListener('click', ()=>{
+    plateGrid.querySelectorAll('input[type="checkbox"]').forEach(b=> b.checked = true);
+    trigger();
+  });
+  resetPlatesBtn.addEventListener('click', ()=>{
+    plateGrid.querySelectorAll('input[type="checkbox"]').forEach(b=> b.checked = false);
+    trigger();
+  });
+
+  // ---------- Init ----------
+  (function init(){
+    // Seed defaults for all exercises if missing
+    exercises.forEach(ex=>{
+      if (!localStorage.getItem(keyFor(ex))){
+        saveState(ex, defaultState());
+      }
+    });
+    loadExerciseState();
+    trigger();
+  })();
+})();
+</script>
+</body>
+</html>
