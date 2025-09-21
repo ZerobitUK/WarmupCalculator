@@ -243,6 +243,9 @@
     const plates = getSelectedPlates();
     const inc = smallestPairIncrement(plates) || 0.5; // fallback
     DOM.desiredWeightInput.step = inc.toString();
+    
+    // MODIFIED: Don't snap if the input is empty
+    if (DOM.desiredWeightInput.value.trim() === '') return;
 
     let dw = parseFloat(DOM.desiredWeightInput.value) || barbellWeight;
     const snapped = snapTotalToIncrement(dw, inc);
@@ -254,10 +257,17 @@
   function updateAll(){
     updateDeload();
     const current = parseFloat(DOM.desiredWeightInput.value);
-    if (isNaN(current) || current < barbellWeight){
-      setStatus(`Enter a valid work set weight (at least ${barbellWeight} kg).`);
-      DOM.warmupRegion.textContent = '';
-      return;
+    
+    // MODIFIED: Handle empty/invalid input gracefully
+    if (isNaN(current) || DOM.desiredWeightInput.value.trim() === '') {
+        setStatus(`Enter a valid work set weight (at least ${barbellWeight} kg).`);
+        DOM.warmupRegion.innerHTML = '';
+        return;
+    }
+    if (current < barbellWeight) {
+        setStatus(`Weight must be at least ${barbellWeight} kg (the barbell weight).`);
+        DOM.warmupRegion.innerHTML = '';
+        return;
     }
 
     const plates = getSelectedPlates();
@@ -290,6 +300,7 @@
     renderTable(sets, current);
   }
 
+  // A trigger for buttons and other controls
   const trigger = () => { enforcePlateAndStep(); updateAll(); saveCurrentExerciseState(); };
 
   // ---------- State wiring ----------
@@ -325,8 +336,19 @@
 
   // ---------- Events ----------
   DOM.exerciseSelect.addEventListener('change', () => { loadExerciseState(); trigger(); });
-  DOM.desiredWeightInput.addEventListener('input', trigger);
-  DOM.desiredWeightInput.addEventListener('change', trigger);
+  
+  // MODIFIED: Decouple 'input' and 'change' events for a smoother experience
+  DOM.desiredWeightInput.addEventListener('input', debounce(() => {
+    updateAll();
+    saveCurrentExerciseState();
+  }, 250)); // Debounce to avoid excessive updates while typing fast
+  
+  DOM.desiredWeightInput.addEventListener('change', () => {
+    enforcePlateAndStep(); // Only snap when the user is done editing
+    updateAll();
+    saveCurrentExerciseState();
+  });
+
 
   DOM.incBtn.addEventListener('click', () => {
     const inc = parseFloat(DOM.desiredWeightInput.step) || 0.5;
