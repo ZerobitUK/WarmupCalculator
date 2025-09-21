@@ -175,3 +175,8 @@ tr:nth-child(even) td {
         min-width: 0;
     }
 }
+td pre {
+  font-family: inherit;
+  font-size: 1em;
+  color: inherit;
+}
