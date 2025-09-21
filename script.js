@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ... all your existing JavaScript functions (initStorage, loadLastState, etc.) go here ...
     // --- The rest of your script from the HTML file is pasted below ---
-    
+
     // Constants
     const barbellWeight = 20; // Standard Olympic barbell weight in kg
 
@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tableHTML += `</tbody></table>`;
         warmupSetsDisplay.innerHTML = tableHTML;
     }
-    
+
 
     // --- Event Listeners & Initial Load ---
     function triggerUpdates() {
@@ -258,14 +258,20 @@ document.addEventListener('DOMContentLoaded', () => {
     workoutForm.addEventListener('submit', (event) => {
         event.preventDefault(); // Prevents the default form submission behavior
     });
-    
+
     exerciseSelect.addEventListener('change', () => {
         loadLastState();
     });
-    desiredWeightInput.addEventListener('input', triggerUpdates);
+    // Removed 'input' event listener to prevent frequent updates
     desiredWeightInput.addEventListener('change', triggerUpdates);
+    // Added a 'keyup' listener to detect when the user presses 'Enter'
+    desiredWeightInput.addEventListener('keyup', (event) => {
+        if (event.key === 'Enter') {
+            triggerUpdates();
+        }
+    });
     plateCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', triggerNextUpdate);
+        checkbox.addEventListener('change', triggerUpdates);
     });
     increaseWeightButton.addEventListener('click', () => adjustWeight(0.5));
     decreaseWeightButton.addEventListener('click', () => adjustWeight(-0.5));
